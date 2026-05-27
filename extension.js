@@ -86,10 +86,7 @@ async function render(worksheet) {
     hasRenderedOnce = true;
     renderGauge(total, nullCount, nullPct, threshold);
   } catch (err) {
-    // Keep previous gauge values visible; only show error on first load
-    if (requestId === renderRequestId && !hasRenderedOnce) {
-      showEmptyState('Map fields to the gauge encodings on the Marks card.');
-    }
+    // Never overlay the gauge with an error — keep last valid state visible
     console.warn('[Gauge] render error:', err.message || err);
   }
 }
