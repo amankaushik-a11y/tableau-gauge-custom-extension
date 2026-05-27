@@ -4,213 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Data Quality Gauge</title>
+  <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@tableau/extensions-api@1.10.0/dist/tableau.extensions.1.latest.min.js"></script>
-  <style>
-    *, *::before, *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-      background: #ffffff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      overflow: hidden;
-    }
-
-    /* ── Gauge wrapper ──────────────────────────────────────────── */
-    .gauge-wrapper {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      width: 100%;
-      max-width: 340px;
-      padding: 12px 16px 16px;
-      user-select: none;
-    }
-
-    #gauge-svg {
-      width: 100%;
-      max-width: 320px;
-      overflow: visible;
-    }
-
-    /* SVG text rendered via presentation attributes, but font-family
-       defined here so it inherits the body font stack */
-    #gauge-svg text {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-    }
-
-    /* Smooth arc and color transitions */
-    #fill-arc {
-      transition: stroke-dasharray 0.55s cubic-bezier(0.4, 0, 0.2, 1),
-                  stroke 0.4s ease;
-    }
-    #pct-text {
-      transition: fill 0.4s ease;
-    }
-
-    /* ── Stats row below SVG ──────────────────────────────────── */
-    .stats-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      width: 100%;
-      max-width: 300px;
-      padding: 0 4px;
-      margin-top: 2px;
-    }
-
-    .stat-item {
-      font-size: 13px;
-      color: #888;
-    }
-
-    .stat-item strong {
-      font-size: 13.5px;
-      font-weight: 700;
-    }
-
-    #total-val   { color: #333; }
-    #invalid-val { transition: color 0.4s ease; }
-
-    /* ── Gear / configure button ───────────────────────────────── */
-    #gear-btn {
-      position: fixed;
-      top: 7px;
-      right: 8px;
-      background: none;
-      border: none;
-      cursor: pointer;
-      font-size: 15px;
-      color: #D0D0D0;
-      padding: 3px 5px;
-      line-height: 1;
-      transition: color 0.2s;
-      z-index: 10;
-    }
-    #gear-btn:hover { color: #888; }
-
-    /* ── Modal overlay ─────────────────────────────────────────── */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.38);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 200;
-      animation: fadeIn 0.15s ease;
-    }
-
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-    .modal-box {
-      background: #fff;
-      border-radius: 10px;
-      padding: 22px 22px 18px;
-      width: 270px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.22);
-      animation: slideUp 0.18s ease;
-    }
-
-    @keyframes slideUp {
-      from { transform: translateY(12px); opacity: 0.5; }
-      to   { transform: translateY(0);    opacity: 1; }
-    }
-
-    .modal-title {
-      font-size: 14px;
-      font-weight: 700;
-      color: #111;
-      margin-bottom: 4px;
-    }
-
-    .modal-subtitle {
-      font-size: 11.5px;
-      color: #AAA;
-      margin-bottom: 16px;
-      line-height: 1.4;
-    }
-
-    .field-group {
-      margin-bottom: 11px;
-    }
-
-    .field-group label {
-      display: block;
-      font-size: 10.5px;
-      font-weight: 700;
-      color: #999;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 5px;
-    }
-
-    .field-group select {
-      width: 100%;
-      padding: 7px 10px;
-      border: 1.5px solid #E8E8E8;
-      border-radius: 6px;
-      font-size: 12.5px;
-      color: #333;
-      background: #FAFAFA;
-      cursor: pointer;
-      appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23AAA'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 10px center;
-      padding-right: 28px;
-    }
-
-    .field-group select:focus {
-      outline: none;
-      border-color: #555;
-    }
-
-    .modal-actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 18px;
-    }
-
-    .btn {
-      flex: 1;
-      padding: 9px;
-      border-radius: 6px;
-      font-size: 12.5px;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
-      transition: background 0.15s, transform 0.1s;
-    }
-    .btn:active { transform: scale(0.97); }
-
-    .btn-primary   { background: #222; color: #fff; }
-    .btn-primary:hover { background: #000; }
-
-    .btn-secondary { background: #F0F0F0; color: #555; }
-    .btn-secondary:hover { background: #E2E2E2; }
-
-    /* ── Empty / warning state inside modal ───────────────────── */
-    .no-params-msg {
-      font-size: 11.5px;
-      color: #C0392B;
-      background: #FEF5F5;
-      border: 1px solid #F5C6C6;
-      border-radius: 5px;
-      padding: 8px 10px;
-      margin-bottom: 10px;
-      display: none;
-    }
-
-    /* ── Utility ───────────────────────────────────────────────── */
-    .hidden { display: none !important; }
-  </style>
 </head>
 <body>
 
@@ -218,19 +13,14 @@
 <div class="gauge-wrapper">
 
   <!--
-    SVG viewport: 300 × 215
-    Arc centre:   (150, 185)
-    Arc radius:   125
-    Stroke width: 22
-    Semicircle circumference: π × 125 ≈ 392.70
-    Left endpoint:  (25,  185)
-    Right endpoint: (275, 185)
-    Path:  M 25 185 A 125 125 0 0 0 275 185
-           ↑ sweep-flag=0 → counterclockwise in SVG = arc goes UP through top
+    SVG viewport : 300 × 215
+    Arc centre   : (150, 185)  |  Radius: 125  |  Stroke-width: 22
+    Circumference: π × 125 ≈ 392.70
+    Path (sweep-flag=1 → dome ∩ shape):  M 25 185 A 125 125 0 0 1 275 185
   -->
   <svg id="gauge-svg" viewBox="0 0 300 215" xmlns="http://www.w3.org/2000/svg">
 
-    <!-- Background (gray) track: sweep-flag=1 draws the dome (∩) shape -->
+    <!-- Background (gray) track -->
     <path
       d="M 25 185 A 125 125 0 0 1 275 185"
       fill="none"
@@ -239,7 +29,7 @@
       stroke-linecap="round"
     />
 
-    <!-- Filled arc — length driven by JS via stroke-dasharray -->
+    <!-- Filled arc — updated dynamically via stroke-dasharray -->
     <path
       id="fill-arc"
       d="M 25 185 A 125 125 0 0 1 275 185"
@@ -251,56 +41,41 @@
     />
 
     <!-- Percentage value -->
-    <text
-      id="pct-text"
-      x="150" y="148"
-      text-anchor="middle"
-      font-size="42"
-      font-weight="700"
-      fill="#E05C5C"
+    <text id="pct-text" x="150" y="148"
+      text-anchor="middle" font-size="42" font-weight="700" fill="#E05C5C"
     >—</text>
 
-    <!-- "invalid rate" sub-label -->
-    <text
-      id="rate-label"
-      x="150" y="167"
-      text-anchor="middle"
-      font-size="13"
-      fill="#ADADAD"
+    <!-- "invalid rate" label -->
+    <text id="rate-label" x="150" y="167"
+      text-anchor="middle" font-size="13" fill="#ADADAD"
     >invalid rate</text>
 
-    <!-- Threshold needle: radial tick line across the arc at the threshold % -->
+    <!-- Threshold needle (radial tick line) -->
     <line
       id="threshold-needle"
       x1="150" y1="185" x2="150" y2="185"
-      stroke="#444"
-      stroke-width="2.5"
-      stroke-linecap="round"
+      stroke="#444" stroke-width="2.5" stroke-linecap="round"
       visibility="hidden"
     />
 
-    <!-- Small dot at the arc midpoint of the threshold needle -->
+    <!-- Dot at needle / arc intersection -->
     <circle
       id="threshold-dot"
       cx="150" cy="185" r="3.5"
-      fill="#444"
-      visibility="hidden"
+      fill="#444" visibility="hidden"
     />
 
-    <!-- Threshold value label: appears just outside the arc -->
+    <!-- Threshold value label outside the arc -->
     <text
       id="threshold-label"
       x="150" y="60"
-      text-anchor="middle"
-      font-size="11"
-      font-weight="600"
-      fill="#555"
+      text-anchor="middle" font-size="11" font-weight="600" fill="#555"
       visibility="hidden"
     >—</text>
 
   </svg>
 
-  <!-- Total / Invalid counts -->
+  <!-- Stats row -->
   <div class="stats-row">
     <span class="stat-item">Total:&nbsp;<strong id="total-val">—</strong></span>
     <span class="stat-item">Invalid:&nbsp;<strong id="invalid-val">—</strong></span>
@@ -308,7 +83,7 @@
 
 </div>
 
-<!-- Gear button (always visible, low-profile) -->
+<!-- Gear / configure button -->
 <button id="gear-btn" title="Configure parameters">&#9881;</button>
 
 <!-- ── Configure modal ──────────────────────────────────────────────────── -->
@@ -320,7 +95,8 @@
     </div>
 
     <div class="no-params-msg" id="no-params-msg">
-      No parameters found in this workbook. Please create Tableau Parameters first, then re-open this dialog.
+      No parameters found in this workbook. Please create Tableau Parameters first,
+      then re-open this dialog.
     </div>
 
     <div class="field-group">
@@ -347,245 +123,6 @@
   </div>
 </div>
 
-<!-- ── Extension script ─────────────────────────────────────────────────── -->
-<script>
-'use strict';
-
-// ── Constants ────────────────────────────────────────────────────────────────
-const ARC_CIRCUMFERENCE = Math.PI * 125; // semicircle with r = 125 ≈ 392.70
-const COLOR_RED   = '#E05C5C';
-const COLOR_GREEN = '#4CAF50';
-
-const SETTING_KEYS = ['totalCountParam', 'nullCountParam', 'nullPctParam', 'thresholdParam'];
-const SEL_IDS      = ['sel-total', 'sel-null-count', 'sel-null-pct', 'sel-threshold'];
-
-// ── Utility ──────────────────────────────────────────────────────────────────
-
-/** Strip formatting ($, %, commas) and parse as float. */
-function parseNum(raw) {
-  if (raw == null || raw === '') return NaN;
-  return parseFloat(String(raw).replace(/[^0-9.\-]/g, ''));
-}
-
-/** Format a number with comma separators, e.g. 4700 → "4,700". */
-function fmtNum(n) {
-  if (n == null || isNaN(n)) return '—';
-  return Number(n).toLocaleString('en-US');
-}
-
-/** Format percentage value, e.g. 30 → "30.0%". */
-function fmtPct(n) {
-  if (n == null || isNaN(n)) return '—';
-  return parseFloat(n).toFixed(1) + '%';
-}
-
-function hasValidSettings(s) {
-  return SETTING_KEYS.every(k => s[k] && s[k].trim() !== '');
-}
-
-// ── Threshold needle ──────────────────────────────────────────────────────────
-// Arc geometry constants (must match the SVG paths above)
-const ARC_CX = 150, ARC_CY = 185, ARC_R = 125;
-
-function updateThresholdNeedle(threshold) {
-  const needle = document.getElementById('threshold-needle');
-  const dot    = document.getElementById('threshold-dot');
-  const label  = document.getElementById('threshold-label');
-
-  const t = parseNum(threshold);
-  if (isNaN(t)) {
-    needle.setAttribute('visibility', 'hidden');
-    dot.setAttribute('visibility', 'hidden');
-    label.setAttribute('visibility', 'hidden');
-    return;
-  }
-
-  // θ for sweep=1 (CW in SVG): 180° at left endpoint, grows to 360° at right
-  const clamped = Math.max(0, Math.min(t, 100));
-  const theta   = (180 + (clamped / 100) * 180) * (Math.PI / 180);
-  const cosT    = Math.cos(theta);
-  const sinT    = Math.sin(theta);
-
-  // Midpoint on the arc
-  const mx = ARC_CX + ARC_R * cosT;
-  const my = ARC_CY + ARC_R * sinT;
-
-  // Needle spans from inside the stroke to outside (half-stroke = 11px, +4px each side)
-  const innerLen = 15, outerLen = 15;
-  needle.setAttribute('x1', (mx - cosT * innerLen).toFixed(2));
-  needle.setAttribute('y1', (my - sinT * innerLen).toFixed(2));
-  needle.setAttribute('x2', (mx + cosT * outerLen).toFixed(2));
-  needle.setAttribute('y2', (my + sinT * outerLen).toFixed(2));
-  needle.setAttribute('visibility', 'visible');
-
-  // Dot at the arc midpoint
-  dot.setAttribute('cx', mx.toFixed(2));
-  dot.setAttribute('cy', my.toFixed(2));
-  dot.setAttribute('visibility', 'visible');
-
-  // Label: 22px outside the arc midline
-  const labelR = ARC_R + 22;
-  const lx = ARC_CX + labelR * cosT;
-  const ly = ARC_CY + labelR * sinT;
-  label.setAttribute('x', lx.toFixed(2));
-  label.setAttribute('y', (ly + 4).toFixed(2)); // +4 for optical baseline alignment
-  label.setAttribute('text-anchor', lx < ARC_CX - 8 ? 'end' : lx > ARC_CX + 8 ? 'start' : 'middle');
-  label.textContent = `${parseFloat(t).toFixed(1)}%`;
-  label.setAttribute('visibility', 'visible');
-}
-
-// ── Gauge rendering ───────────────────────────────────────────────────────────
-function renderGauge(total, nullCount, nullPct, threshold) {
-  const pct    = parseNum(nullPct);
-  const thresh = parseNum(threshold);
-  const isOver = !isNaN(pct) && !isNaN(thresh) && pct > thresh;
-  const color  = isOver ? COLOR_RED : COLOR_GREEN;
-
-  // Fill arc length proportional to percentage (clamped 0–100)
-  const clamped  = isNaN(pct) ? 0 : Math.max(0, Math.min(pct, 100));
-  const fillLen  = (clamped / 100) * ARC_CIRCUMFERENCE;
-
-  document.getElementById('fill-arc').setAttribute(
-    'stroke-dasharray',
-    `${fillLen.toFixed(2)} ${ARC_CIRCUMFERENCE.toFixed(2)}`
-  );
-  document.getElementById('fill-arc').setAttribute('stroke', color);
-
-  const pctEl = document.getElementById('pct-text');
-  pctEl.textContent = fmtPct(pct);
-  pctEl.setAttribute('fill', color);
-
-  document.getElementById('total-val').textContent   = fmtNum(parseNum(total));
-  document.getElementById('invalid-val').textContent = fmtNum(parseNum(nullCount));
-  document.getElementById('invalid-val').style.color = color;
-
-  updateThresholdNeedle(threshold);
-}
-
-// ── Tableau parameter loading ─────────────────────────────────────────────────
-let _unlisteners = []; // store removeEventListener tokens
-
-async function loadData(settings) {
-  // Remove previous listeners
-  _unlisteners.forEach(fn => fn());
-  _unlisteners = [];
-
-  const dash = tableau.extensions.dashboardContent.dashboard;
-
-  const [pTotal, pNullCount, pNullPct, pThreshold] = await Promise.all([
-    dash.findParameterAsync(settings.totalCountParam),
-    dash.findParameterAsync(settings.nullCountParam),
-    dash.findParameterAsync(settings.nullPctParam),
-    dash.findParameterAsync(settings.thresholdParam),
-  ]);
-
-  function currentValues() {
-    return {
-      total:     pTotal?.currentValue.value,
-      nullCount: pNullCount?.currentValue.value,
-      nullPct:   pNullPct?.currentValue.value,
-      threshold: pThreshold?.currentValue.value,
-    };
-  }
-
-  // Initial render
-  const v = currentValues();
-  renderGauge(v.total, v.nullCount, v.nullPct, v.threshold);
-
-  // Live updates when any parameter changes
-  [pTotal, pNullCount, pNullPct, pThreshold].forEach(param => {
-    if (!param) return;
-    const token = param.addEventListener(
-      tableau.TableauEventType.ParameterChanged,
-      () => {
-        const vals = currentValues();
-        renderGauge(vals.total, vals.nullCount, vals.nullPct, vals.threshold);
-      }
-    );
-    _unlisteners.push(() => param.removeEventListener(token));
-  });
-}
-
-// ── Config modal ──────────────────────────────────────────────────────────────
-async function showConfig() {
-  const modal = document.getElementById('config-modal');
-  modal.classList.remove('hidden');
-
-  const noParamsMsg = document.getElementById('no-params-msg');
-
-  try {
-    const dash   = tableau.extensions.dashboardContent.dashboard;
-    const params = await dash.getParametersAsync();
-    const saved  = tableau.extensions.settings.getAll();
-
-    noParamsMsg.style.display = params.length === 0 ? 'block' : 'none';
-
-    SEL_IDS.forEach((selId, i) => {
-      const sel = document.getElementById(selId);
-      sel.innerHTML = '<option value="">— select parameter —</option>';
-      params.forEach(p => {
-        const opt      = document.createElement('option');
-        opt.value      = p.name;
-        opt.textContent = p.name;
-        if (saved[SETTING_KEYS[i]] === p.name) opt.selected = true;
-        sel.appendChild(opt);
-      });
-    });
-  } catch (err) {
-    console.warn('Could not load parameters:', err);
-    noParamsMsg.style.display = 'block';
-  }
-}
-
-function hideConfig() {
-  document.getElementById('config-modal').classList.add('hidden');
-}
-
-async function saveConfig() {
-  const settings = tableau.extensions.settings;
-  SEL_IDS.forEach((selId, i) => {
-    settings.set(SETTING_KEYS[i], document.getElementById(selId).value);
-  });
-  await settings.saveAsync();
-  hideConfig();
-
-  const saved = settings.getAll();
-  if (hasValidSettings(saved)) {
-    await loadData(saved);
-  }
-}
-
-// ── Event wiring ──────────────────────────────────────────────────────────────
-document.getElementById('gear-btn').addEventListener('click', showConfig);
-document.getElementById('cancel-btn').addEventListener('click', hideConfig);
-document.getElementById('save-btn').addEventListener('click', saveConfig);
-
-// Close modal when clicking the dark overlay (not the box itself)
-document.getElementById('config-modal').addEventListener('click', e => {
-  if (e.target === e.currentTarget) hideConfig();
-});
-
-// ── Initialization ─────────────────────────────────────────────────────────────
-(async () => {
-  try {
-    // Tell Tableau about our configure handler (adds "Configure…" to the context menu)
-    await tableau.extensions.initializeAsync({ configure: showConfig });
-
-    const saved = tableau.extensions.settings.getAll();
-
-    if (hasValidSettings(saved)) {
-      await loadData(saved);
-    } else {
-      // First run — open config immediately
-      showConfig();
-    }
-  } catch (err) {
-    // ── Demo mode (running in a plain browser, not inside Tableau) ──
-    console.info('[Gauge] Running in demo mode (not connected to Tableau).');
-    document.getElementById('gear-btn').style.display = 'none'; // hide config in demo
-    renderGauge(4700, 1410, 30.0, 25);
-  }
-})();
-</script>
+<script src="extension.js"></script>
 </body>
 </html>
