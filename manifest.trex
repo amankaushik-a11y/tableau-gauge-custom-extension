@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest manifest-version="0.1" xmlns="http://www.tableau.com/xml/extension_manifest">
-  <dashboard-extension id="com.dataqualitygauge.extension" extension-version="1.0.0">
+  <viz-extension id="com.dataqualitygauge.vizextension" extension-version="1.0.0"
+    default-height="300" default-width="400">
     <default-locale>en_US</default-locale>
     <name resource-id="name"/>
     <description resource-id="description"/>
@@ -8,22 +9,13 @@
       name="Data Quality Gauge"
       email="admin@example.com"
       organization="Example Org"
-      website="https://example.github.io"/>
-    <min-api-version>1.4</min-api-version>
+      website="https://amankaushik-a11y.github.io"/>
+    <min-api-version>1.10</min-api-version>
     <source-location>
-      <!--
-        ╔══════════════════════════════════════════════════════════════╗
-        ║  UPDATE THIS URL to your GitHub Pages deployment address.   ║
-        ║  Example: https://YOUR-USERNAME.github.io/REPO-NAME/        ║
-        ╚══════════════════════════════════════════════════════════════╝
-      -->
       <url>https://amankaushik-a11y.github.io/tableau-gauge-custom-extension/</url>
     </source-location>
     <icon>iVBORw0KGgoAAAANSUhEUgAAAEYAAABGCAIAAAD+THXTAAAA20lEQVR42u3YSw7CMAxFUS+0S/eAncAAqQPUQvE/1X3KBo6ekjiR5+0ikCBBggQJEiRIkCBBggQJEiRItyCp6sIk/SejSerLLJLGpZ+kOekhaX5KSVqVCtJj295LC5NI2j2TVWL2jFWJx3ORFLgPK0hnqqRjJoz0xfOhKrgSAkg/Pbuq7NZ2kS566gfFXFLLIG8ktXj8Khcp+8kYTGqsyFmUzKzIU5SRVPljEUOaUJG5KJlcka0oSIuSRnkMKkiQIKWRin/lIZlIqwcSJEiQIEGCBAkSJEiQIB3nBcbfD7R1pFjCAAAAAElFTkSuQmCC</icon>
-    <permissions>
-      <permission>full data</permission>
-    </permissions>
-  </dashboard-extension>
+  </viz-extension>
   <resources>
     <resource id="name">
       <text locale="en_US">Data Quality Gauge</text>

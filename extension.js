@@ -115,13 +115,13 @@ async function loadData(settings) {
   _unlisteners.forEach(fn => fn());
   _unlisteners = [];
 
-  const dash = tableau.extensions.dashboardContent.dashboard;
+  const workbook = tableau.extensions.workbook;
 
   const [pTotal, pNullCount, pNullPct, pThreshold] = await Promise.all([
-    dash.findParameterAsync(settings.totalCountParam),
-    dash.findParameterAsync(settings.nullCountParam),
-    dash.findParameterAsync(settings.nullPctParam),
-    dash.findParameterAsync(settings.thresholdParam),
+    workbook.findParameterAsync(settings.totalCountParam),
+    workbook.findParameterAsync(settings.nullCountParam),
+    workbook.findParameterAsync(settings.nullPctParam),
+    workbook.findParameterAsync(settings.thresholdParam),
   ]);
 
   function currentValues() {
@@ -156,8 +156,8 @@ async function showConfig() {
   const noParamsMsg = document.getElementById('no-params-msg');
 
   try {
-    const dash   = tableau.extensions.dashboardContent.dashboard;
-    const params = await dash.getParametersAsync();
+    const workbook = tableau.extensions.workbook;
+    const params   = await workbook.getParametersAsync();
     const saved  = tableau.extensions.settings.getAll();
 
     noParamsMsg.style.display = params.length === 0 ? 'block' : 'none';
