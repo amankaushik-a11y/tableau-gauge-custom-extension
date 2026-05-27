@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest manifest-version="0.1" xmlns="http://www.tableau.com/xml/extension_manifest">
-  <desktop-extension id="com.dataqualitygauge.extension" extension-version="1.0.0">
+  <dashboard-extension id="com.dataqualitygauge.extension" extension-version="1.0.0">
     <default-locale>en_US</default-locale>
     <name resource-id="name"/>
     <description resource-id="description"/>
@@ -23,7 +23,7 @@
     <permissions>
       <permission>full data</permission>
     </permissions>
-  </desktop-extension>
+  </dashboard-extension>
   <resources>
     <resource id="name">
       <text locale="en_US">Data Quality Gauge</text>
