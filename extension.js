@@ -14,6 +14,7 @@ const ENCODING_THRESHOLD  = 'threshold';
 
 let activeWorksheet = null;
 let renderRequestId = 0;
+let hasRenderedOnce = false;
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 bootstrap();
@@ -35,6 +36,14 @@ function bootstrap() {
       () => render(activeWorksheet)
     );
 
+    // Re-render when the user changes field formatting on the Marks card
+    if (tableau.TableauEventType.WorksheetFormattingChanged) {
+      activeWorksheet.addEventListener(
+        tableau.TableauEventType.WorksheetFormattingChanged,
+        () => render(activeWorksheet)
+      );
+    }
+
     render(activeWorksheet);
   }).catch(err => {
     // Demo mode — not running inside Tableau
@@ -46,7 +55,6 @@ function bootstrap() {
 // ── Render ────────────────────────────────────────────────────────────────────
 async function render(worksheet) {
   const requestId = ++renderRequestId;
-  hideEmptyState();
 
   try {
     const [vizSpec, dataTable] = await Promise.all([
@@ -58,7 +66,7 @@ async function render(worksheet) {
 
     const marksSpec = getActiveMarksSpec(vizSpec);
     if (!marksSpec) {
-      showEmptyState('No marks specification found. Drag fields to the Marks card.');
+      if (!hasRenderedOnce) showEmptyState('Drag fields to the Marks card encodings.');
       return;
     }
 
@@ -68,21 +76,27 @@ async function render(worksheet) {
     const threshold = getFirstValue(dataTable, marksSpec, ENCODING_THRESHOLD);
 
     if (nullPct === null && total === null && nullCount === null) {
-      showEmptyState('Map fields to the Total Count, Null Count, Null %, and Threshold encodings on the Marks card.');
+      if (!hasRenderedOnce) {
+        showEmptyState('Map fields to the Total Count, Null Count, Null %, and Threshold encodings on the Marks card.');
+      }
       return;
     }
 
+    hideEmptyState();
+    hasRenderedOnce = true;
     renderGauge(total, nullCount, nullPct, threshold);
   } catch (err) {
-    if (requestId === renderRequestId) {
-      showEmptyState('Error: ' + (err.message || String(err)));
+    // Keep previous gauge values visible; only show error on first load
+    if (requestId === renderRequestId && !hasRenderedOnce) {
+      showEmptyState('Map fields to the gauge encodings on the Marks card.');
     }
+    console.warn('[Gauge] render error:', err.message || err);
   }
 }
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
 async function fetchSummaryData(worksheet) {
-  const options = { ignoreSelection: true, applyWorksheetFormatting: false };
+  const options = { ignoreSelection: true, applyWorksheetFormatting: true };
   const reader = await worksheet.getSummaryDataReaderAsync(PAGE_ROW_COUNT, options);
   try {
     if (typeof reader.getAllPagesAsync === 'function') {
@@ -150,20 +164,23 @@ function getFirstValue(dataTable, marksSpec, encodingId) {
   const rows = dataTable.data ?? [];
   if (!rows.length) return null;
   const cell = rows[0][colIdx];
-  return cell?.value ?? cell?.nativeValue ?? null;
+  // Prefer formattedValue so Tableau's number/percentage formatting is respected
+  return cell?.formattedValue ?? cell?.value ?? cell?.nativeValue ?? null;
 }
 
 // ── Empty state ───────────────────────────────────────────────────────────────
 function showEmptyState(msg) {
   const el = document.getElementById('empty-state');
   if (el) { el.textContent = msg; el.hidden = false; }
-  document.getElementById('gauge-wrapper').style.visibility = 'hidden';
+  const wrapper = document.getElementById('gauge-wrapper');
+  if (wrapper) wrapper.hidden = true;
 }
 
 function hideEmptyState() {
   const el = document.getElementById('empty-state');
   if (el) el.hidden = true;
-  document.getElementById('gauge-wrapper').style.visibility = 'visible';
+  const wrapper = document.getElementById('gauge-wrapper');
+  if (wrapper) wrapper.hidden = false;
 }
 
 // ── Utility ───────────────────────────────────────────────────────────────────
