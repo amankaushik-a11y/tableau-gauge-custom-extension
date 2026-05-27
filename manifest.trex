@@ -1,27 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest manifest-version="0.1" xmlns="http://www.tableau.com/xml/extension_manifest">
-  <viz-extension id="com.dataqualitygauge.vizextension" extension-version="1.0.0"
-    default-height="300" default-width="400">
+  <worksheet-extension id="com.dataqualitygauge.worksheetextension" extension-version="1.0.0">
     <default-locale>en_US</default-locale>
     <name resource-id="name"/>
-    <description resource-id="description"/>
-    <author
-      name="Data Quality Gauge"
-      email="admin@example.com"
-      organization="Example Org"
-      website="https://amankaushik-a11y.github.io"/>
-    <min-api-version>1.10</min-api-version>
+    <description>Data quality gauge chart showing null rate, total count, invalid count, and threshold-based color coding.</description>
+    <author name="Data Quality Gauge" email="admin@example.com" organization="Example Org" website="https://amankaushik-a11y.github.io"/>
+    <min-api-version>1.11</min-api-version>
     <source-location>
       <url>https://amankaushik-a11y.github.io/tableau-gauge-custom-extension/</url>
     </source-location>
-    <icon>iVBORw0KGgoAAAANSUhEUgAAAEYAAABGCAIAAAD+THXTAAAA20lEQVR42u3YSw7CMAxFUS+0S/eAncAAqQPUQvE/1X3KBo6ekjiR5+0ikCBBggQJEiRIkCBBggQJEiRItyCp6sIk/SejSerLLJLGpZ+kOekhaX5KSVqVCtJj295LC5NI2j2TVWL2jFWJx3ORFLgPK0hnqqRjJoz0xfOhKrgSAkg/Pbuq7NZ2kS566gfFXFLLIG8ktXj8Khcp+8kYTGqsyFmUzKzIU5SRVPljEUOaUJG5KJlcka0oSIuSRnkMKkiQIKWRin/lIZlIqwcSJEiQIEGCBAkSJEiQIB3nBcbfD7R1pFjCAAAAAElFTkSuQmCC</icon>
-  </viz-extension>
+    <icon/>
+    <encoding id="total-count">
+      <display-name resource-id="total_count_label">Total Count</display-name>
+      <role-spec><role-type>continuous-measure</role-type></role-spec>
+      <fields max-count="1"/>
+    </encoding>
+    <encoding id="null-count">
+      <display-name resource-id="null_count_label">Null / Invalid Count</display-name>
+      <role-spec><role-type>continuous-measure</role-type></role-spec>
+      <fields max-count="1"/>
+    </encoding>
+    <encoding id="null-pct">
+      <display-name resource-id="null_pct_label">Null % (0–100)</display-name>
+      <role-spec><role-type>continuous-measure</role-type></role-spec>
+      <fields max-count="1"/>
+    </encoding>
+    <encoding id="threshold">
+      <display-name resource-id="threshold_label">Threshold %</display-name>
+      <role-spec><role-type>continuous-measure</role-type></role-spec>
+      <fields max-count="1"/>
+    </encoding>
+  </worksheet-extension>
   <resources>
-    <resource id="name">
-      <text locale="en_US">Data Quality Gauge</text>
-    </resource>
-    <resource id="description">
-      <text locale="en_US">Displays a gauge chart for data quality metrics — shows null rate, total count, invalid count, and threshold-based color coding.</text>
-    </resource>
+    <resource id="name"><text locale="en_US">Data Quality Gauge</text></resource>
+    <resource id="total_count_label"><text locale="en_US">Total Count</text></resource>
+    <resource id="null_count_label"><text locale="en_US">Null / Invalid Count</text></resource>
+    <resource id="null_pct_label"><text locale="en_US">Null % (0–100)</text></resource>
+    <resource id="threshold_label"><text locale="en_US">Threshold %</text></resource>
   </resources>
 </manifest>

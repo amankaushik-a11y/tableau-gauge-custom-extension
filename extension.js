@@ -5,12 +5,168 @@ const ARC_CIRCUMFERENCE = Math.PI * 125; // semicircle r=125 ≈ 392.70
 const ARC_CX = 150, ARC_CY = 185, ARC_R = 125;
 const COLOR_RED   = '#E05C5C';
 const COLOR_GREEN = '#4CAF50';
+const PAGE_ROW_COUNT = 100;
 
-const SETTING_KEYS = ['totalCountParam', 'nullCountParam', 'nullPctParam', 'thresholdParam'];
-const SEL_IDS      = ['sel-total', 'sel-null-count', 'sel-null-pct', 'sel-threshold'];
+const ENCODING_TOTAL      = 'total-count';
+const ENCODING_NULL_COUNT = 'null-count';
+const ENCODING_NULL_PCT   = 'null-pct';
+const ENCODING_THRESHOLD  = 'threshold';
+
+let activeWorksheet = null;
+let renderRequestId = 0;
+
+// ── Bootstrap ─────────────────────────────────────────────────────────────────
+bootstrap();
+
+function bootstrap() {
+  if (!window.tableau?.extensions?.initializeAsync) {
+    showEmptyState('Tableau Extensions API is unavailable.');
+    return;
+  }
+
+  tableau.extensions.initializeAsync().then(() => {
+    activeWorksheet = tableau.extensions.worksheetContent?.worksheet;
+    if (!activeWorksheet) {
+      throw new Error('This Viz Extension must be loaded inside a Tableau worksheet.');
+    }
+
+    activeWorksheet.addEventListener(
+      tableau.TableauEventType.SummaryDataChanged,
+      () => render(activeWorksheet)
+    );
+
+    render(activeWorksheet);
+  }).catch(err => {
+    // Demo mode — not running inside Tableau
+    console.info('[Gauge] Running in demo mode:', err.message);
+    renderGauge(4700, 1410, 30.0, 25);
+  });
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+async function render(worksheet) {
+  const requestId = ++renderRequestId;
+  hideEmptyState();
+
+  try {
+    const [vizSpec, dataTable] = await Promise.all([
+      worksheet.getVisualSpecificationAsync(),
+      fetchSummaryData(worksheet),
+    ]);
+
+    if (requestId !== renderRequestId) return;
+
+    const marksSpec = getActiveMarksSpec(vizSpec);
+    if (!marksSpec) {
+      showEmptyState('No marks specification found. Drag fields to the Marks card.');
+      return;
+    }
+
+    const total     = getFirstValue(dataTable, marksSpec, ENCODING_TOTAL);
+    const nullCount = getFirstValue(dataTable, marksSpec, ENCODING_NULL_COUNT);
+    const nullPct   = getFirstValue(dataTable, marksSpec, ENCODING_NULL_PCT);
+    const threshold = getFirstValue(dataTable, marksSpec, ENCODING_THRESHOLD);
+
+    if (nullPct === null && total === null && nullCount === null) {
+      showEmptyState('Map fields to the Total Count, Null Count, Null %, and Threshold encodings on the Marks card.');
+      return;
+    }
+
+    renderGauge(total, nullCount, nullPct, threshold);
+  } catch (err) {
+    if (requestId === renderRequestId) {
+      showEmptyState('Error: ' + (err.message || String(err)));
+    }
+  }
+}
+
+// ── Data fetching ─────────────────────────────────────────────────────────────
+async function fetchSummaryData(worksheet) {
+  const options = { ignoreSelection: true, applyWorksheetFormatting: false };
+  const reader = await worksheet.getSummaryDataReaderAsync(PAGE_ROW_COUNT, options);
+  try {
+    if (typeof reader.getAllPagesAsync === 'function') {
+      return await reader.getAllPagesAsync();
+    }
+    const pages = [];
+    for (let i = 0; i < (reader.pageCount ?? 0); i++) {
+      pages.push(await reader.getPageAsync(i));
+    }
+    return pages.length
+      ? { columns: pages[0].columns ?? [], data: pages.flatMap(p => p.data ?? []) }
+      : { columns: [], data: [] };
+  } finally {
+    await reader.releaseAsync();
+  }
+}
+
+// ── Encoding helpers ──────────────────────────────────────────────────────────
+function getActiveMarksSpec(vizSpec) {
+  const specs = vizSpec?.marksSpecifications;
+  if (Array.isArray(specs) && specs.length) {
+    return specs[vizSpec.activeMarksSpecificationIndex ?? 0] ?? specs[0];
+  }
+  const legacy = vizSpec?.marksSpecificationCollection;
+  return (Array.isArray(legacy) && legacy.length) ? legacy[0] : null;
+}
+
+function getEncodingFields(marksSpec, encodingId) {
+  const id = encodingId.toLowerCase();
+  const encodings = marksSpec.encodings ?? marksSpec.encodingCollection ?? [];
+  const matched = encodings.filter(e => (e?.id ?? '').toLowerCase() === id);
+  if (!matched.length) return [];
+  return matched.flatMap(e => {
+    const fields = [];
+    if (Array.isArray(e.fields)) fields.push(...e.fields);
+    else if (e.field) fields.push(...(Array.isArray(e.field) ? e.field : [e.field]));
+    if (Array.isArray(e.fieldCollection)) fields.push(...e.fieldCollection);
+    return fields.map(f =>
+      typeof f === 'string'
+        ? { id: f, name: f, fieldName: f }
+        : { ...f, id: f.id ?? f.fieldId, name: f.name ?? f.fieldName ?? f.fieldCaption, fieldName: f.fieldName ?? f.name ?? f.fieldCaption }
+    );
+  });
+}
+
+function findColumnIndex(columns, fields) {
+  if (!fields.length) return -1;
+  const tokens = new Set(
+    fields.flatMap(f => [f.id, f.fieldId, f.name, f.fieldName, f.fieldCaption])
+      .filter(Boolean).map(s => s.trim().toLowerCase())
+  );
+  return columns.findIndex(c => {
+    const colTokens = [c?.fieldId, c?.fieldName, c?.fieldCaption, c?.name, c?.caption]
+      .filter(Boolean).map(s => s.trim().toLowerCase());
+    return colTokens.some(t => tokens.has(t));
+  });
+}
+
+function getFirstValue(dataTable, marksSpec, encodingId) {
+  const fields = getEncodingFields(marksSpec, encodingId);
+  if (!fields.length) return null;
+  const columns = dataTable.columns ?? [];
+  const colIdx = findColumnIndex(columns, fields);
+  if (colIdx < 0) return null;
+  const rows = dataTable.data ?? [];
+  if (!rows.length) return null;
+  const cell = rows[0][colIdx];
+  return cell?.value ?? cell?.nativeValue ?? null;
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+function showEmptyState(msg) {
+  const el = document.getElementById('empty-state');
+  if (el) { el.textContent = msg; el.hidden = false; }
+  document.getElementById('gauge-wrapper').style.visibility = 'hidden';
+}
+
+function hideEmptyState() {
+  const el = document.getElementById('empty-state');
+  if (el) el.hidden = true;
+  document.getElementById('gauge-wrapper').style.visibility = 'visible';
+}
 
 // ── Utility ───────────────────────────────────────────────────────────────────
-
 function parseNum(raw) {
   if (raw == null || raw === '') return NaN;
   return parseFloat(String(raw).replace(/[^0-9.\-]/g, ''));
@@ -26,12 +182,7 @@ function fmtPct(n) {
   return parseFloat(n).toFixed(1) + '%';
 }
 
-function hasValidSettings(s) {
-  return SETTING_KEYS.every(k => s[k] && s[k].trim() !== '');
-}
-
 // ── Threshold needle ──────────────────────────────────────────────────────────
-
 function updateThresholdNeedle(threshold) {
   const needle = document.getElementById('threshold-needle');
   const dot    = document.getElementById('threshold-dot');
@@ -45,17 +196,15 @@ function updateThresholdNeedle(threshold) {
     return;
   }
 
-  // θ: 180° at left endpoint → 360° at right endpoint (sweep-flag=1, CW in SVG)
+  // θ: 180° at left endpoint → 360° at right endpoint
   const clamped = Math.max(0, Math.min(t, 100));
   const theta   = (180 + (clamped / 100) * 180) * (Math.PI / 180);
   const cosT    = Math.cos(theta);
   const sinT    = Math.sin(theta);
 
-  // Midpoint on the arc surface
   const mx = ARC_CX + ARC_R * cosT;
   const my = ARC_CY + ARC_R * sinT;
 
-  // Needle: 15px inside arc → 15px outside arc (crosses the stroke)
   const innerLen = 15, outerLen = 15;
   needle.setAttribute('x1', (mx - cosT * innerLen).toFixed(2));
   needle.setAttribute('y1', (my - sinT * innerLen).toFixed(2));
@@ -63,12 +212,10 @@ function updateThresholdNeedle(threshold) {
   needle.setAttribute('y2', (my + sinT * outerLen).toFixed(2));
   needle.setAttribute('visibility', 'visible');
 
-  // Dot at arc midpoint
   dot.setAttribute('cx', mx.toFixed(2));
   dot.setAttribute('cy', my.toFixed(2));
   dot.setAttribute('visibility', 'visible');
 
-  // Label: 22px outside the arc midline
   const labelR = ARC_R + 22;
   const lx = ARC_CX + labelR * cosT;
   const ly = ARC_CY + labelR * sinT;
@@ -80,7 +227,6 @@ function updateThresholdNeedle(threshold) {
 }
 
 // ── Gauge rendering ───────────────────────────────────────────────────────────
-
 function renderGauge(total, nullCount, nullPct, threshold) {
   const pct    = parseNum(nullPct);
   const thresh = parseNum(threshold);
@@ -106,123 +252,3 @@ function renderGauge(total, nullCount, nullPct, threshold) {
 
   updateThresholdNeedle(threshold);
 }
-
-// ── Tableau parameter loading ─────────────────────────────────────────────────
-
-let _unlisteners = [];
-
-async function loadData(settings) {
-  _unlisteners.forEach(fn => fn());
-  _unlisteners = [];
-
-  const workbook = tableau.extensions.workbook;
-
-  const [pTotal, pNullCount, pNullPct, pThreshold] = await Promise.all([
-    workbook.findParameterAsync(settings.totalCountParam),
-    workbook.findParameterAsync(settings.nullCountParam),
-    workbook.findParameterAsync(settings.nullPctParam),
-    workbook.findParameterAsync(settings.thresholdParam),
-  ]);
-
-  function currentValues() {
-    return {
-      total:     pTotal?.currentValue.value,
-      nullCount: pNullCount?.currentValue.value,
-      nullPct:   pNullPct?.currentValue.value,
-      threshold: pThreshold?.currentValue.value,
-    };
-  }
-
-  const v = currentValues();
-  renderGauge(v.total, v.nullCount, v.nullPct, v.threshold);
-
-  [pTotal, pNullCount, pNullPct, pThreshold].forEach(param => {
-    if (!param) return;
-    const token = param.addEventListener(
-      tableau.TableauEventType.ParameterChanged,
-      () => {
-        const vals = currentValues();
-        renderGauge(vals.total, vals.nullCount, vals.nullPct, vals.threshold);
-      }
-    );
-    _unlisteners.push(() => param.removeEventListener(token));
-  });
-}
-
-// ── Config modal ──────────────────────────────────────────────────────────────
-
-async function showConfig() {
-  document.getElementById('config-modal').classList.remove('hidden');
-  const noParamsMsg = document.getElementById('no-params-msg');
-
-  try {
-    const workbook = tableau.extensions.workbook;
-    const params   = await workbook.getParametersAsync();
-    const saved  = tableau.extensions.settings.getAll();
-
-    noParamsMsg.style.display = params.length === 0 ? 'block' : 'none';
-
-    SEL_IDS.forEach((selId, i) => {
-      const sel = document.getElementById(selId);
-      sel.innerHTML = '<option value="">— select parameter —</option>';
-      params.forEach(p => {
-        const opt       = document.createElement('option');
-        opt.value       = p.name;
-        opt.textContent = p.name;
-        if (saved[SETTING_KEYS[i]] === p.name) opt.selected = true;
-        sel.appendChild(opt);
-      });
-    });
-  } catch (err) {
-    console.warn('Could not load parameters:', err);
-    noParamsMsg.style.display = 'block';
-  }
-}
-
-function hideConfig() {
-  document.getElementById('config-modal').classList.add('hidden');
-}
-
-async function saveConfig() {
-  const settings = tableau.extensions.settings;
-  SEL_IDS.forEach((selId, i) => {
-    settings.set(SETTING_KEYS[i], document.getElementById(selId).value);
-  });
-  await settings.saveAsync();
-  hideConfig();
-
-  const saved = settings.getAll();
-  if (hasValidSettings(saved)) {
-    await loadData(saved);
-  }
-}
-
-// ── Event wiring ──────────────────────────────────────────────────────────────
-
-document.getElementById('gear-btn').addEventListener('click', showConfig);
-document.getElementById('cancel-btn').addEventListener('click', hideConfig);
-document.getElementById('save-btn').addEventListener('click', saveConfig);
-
-document.getElementById('config-modal').addEventListener('click', e => {
-  if (e.target === e.currentTarget) hideConfig();
-});
-
-// ── Initialization ────────────────────────────────────────────────────────────
-
-(async () => {
-  try {
-    await tableau.extensions.initializeAsync({ configure: showConfig });
-
-    const saved = tableau.extensions.settings.getAll();
-    if (hasValidSettings(saved)) {
-      await loadData(saved);
-    } else {
-      showConfig();
-    }
-  } catch (err) {
-    // Demo mode — not running inside Tableau
-    console.info('[Gauge] Running in demo mode (not connected to Tableau).');
-    document.getElementById('gear-btn').style.display = 'none';
-    renderGauge(4700, 1410, 30.0, 25);
-  }
-})();

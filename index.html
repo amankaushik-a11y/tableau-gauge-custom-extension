@@ -5,12 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Data Quality Gauge</title>
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/@tableau/extensions-api@1.10.0/dist/tableau.extensions.1.latest.min.js"></script>
+  <script src="vendor/tableau.extensions.1.latest.js"></script>
 </head>
 <body>
 
+<!-- Empty state (shown when fields are not yet mapped) -->
+<div id="empty-state" hidden></div>
+
 <!-- ── Main gauge view ──────────────────────────────────────────────────── -->
-<div class="gauge-wrapper">
+<div class="gauge-wrapper" id="gauge-wrapper">
 
   <!--
     SVG viewport : 300 × 215
@@ -81,46 +84,6 @@
     <span class="stat-item">Invalid:&nbsp;<strong id="invalid-val">—</strong></span>
   </div>
 
-</div>
-
-<!-- Gear / configure button -->
-<button id="gear-btn" title="Configure parameters">&#9881;</button>
-
-<!-- ── Configure modal ──────────────────────────────────────────────────── -->
-<div class="modal-overlay hidden" id="config-modal">
-  <div class="modal-box">
-    <div class="modal-title">Configure Parameters</div>
-    <div class="modal-subtitle">
-      Map each gauge input to a Tableau&nbsp;Parameter in your workbook.
-    </div>
-
-    <div class="no-params-msg" id="no-params-msg">
-      No parameters found in this workbook. Please create Tableau Parameters first,
-      then re-open this dialog.
-    </div>
-
-    <div class="field-group">
-      <label>Total Count</label>
-      <select id="sel-total"><option value="">— select parameter —</option></select>
-    </div>
-    <div class="field-group">
-      <label>Null / Invalid Count</label>
-      <select id="sel-null-count"><option value="">— select parameter —</option></select>
-    </div>
-    <div class="field-group">
-      <label>Null % (0–100)</label>
-      <select id="sel-null-pct"><option value="">— select parameter —</option></select>
-    </div>
-    <div class="field-group">
-      <label>Threshold %</label>
-      <select id="sel-threshold"><option value="">— select parameter —</option></select>
-    </div>
-
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="cancel-btn">Cancel</button>
-      <button class="btn btn-primary"   id="save-btn">Save</button>
-    </div>
-  </div>
 </div>
 
 <script src="extension.js"></script>
