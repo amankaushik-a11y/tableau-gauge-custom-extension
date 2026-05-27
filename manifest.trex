@@ -27,7 +27,7 @@
     </encoding>
     <encoding id="threshold">
       <display-name resource-id="threshold_label">Threshold %</display-name>
-      <role-spec><role-type>continuous-measure</role-type></role-spec>
+      <role-spec><role-type>discrete-dimension</role-type></role-spec>
       <fields max-count="1"/>
     </encoding>
   </worksheet-extension>
